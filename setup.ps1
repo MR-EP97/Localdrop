@@ -7,15 +7,22 @@ if (-not $Elevated) {
 }
 
 Write-Host "Administrator access confirmed. Proceeding..."
+Write-Host "path: $PSScriptRoot"
 
 Set-Location -Path $PSScriptRoot
-
+Write-Host "path: $PSScriptRoot"
 
 $phpUrl = "https://windows.php.net/downloads/releases/php-8.2.28-Win32-vs16-x64.zip"
 $phpZip = "php.zip"
 $phpDir = "php"
+$shareDir = "share"
 
-if (-Not (Test-Path $phpZip)) {
+if (-Not (Test-Path $shareDir)) {
+    Write-Host "Creating 'share' directory..."
+    New-Item -Path $shareDir -ItemType Directory
+}
+
+if (-Not (Test-Path $phpZip) -and -Not (Test-Path $phpDir)) {
     Write-Host "Downloading PHP..."
     Invoke-WebRequest -Uri $phpUrl -OutFile $phpZip
 
@@ -75,6 +82,32 @@ if (-not $localIP) {
     Write-Host "Could not determine local IP address." -ForegroundColor Red
     exit 1
 }
+
+
+$phpIniPath = Join-Path -Path $phpDir -ChildPath "php.ini"
+
+if (-Not (Test-Path $phpIniPath)) {
+    if (Test-Path "$phpDir\php.ini-development") {
+        Copy-Item "$phpDir\php.ini-development" $phpIniPath
+    } elseif (Test-Path "$phpDir\php.ini-production") {
+        Copy-Item "$phpDir\php.ini-production" $phpIniPath
+    } else {
+        Write-Host "No default php.ini file found!" -ForegroundColor Red
+        exit 1
+    }
+}
+
+
+(Get-Content $phpIniPath) |
+    ForEach-Object {
+        $_ -replace '^\s*post_max_size\s*=.*$', 'post_max_size = 2G'
+    } |
+    ForEach-Object {
+        $_ -replace '^\s*upload_max_filesize\s*=.*$', 'upload_max_filesize = 2G'
+    } |
+    Set-Content $phpIniPath
+
+Write-Host "php.ini updated with increased limits: post_max_size=2G, upload_max_filesize=2G"
 
 
 try {
