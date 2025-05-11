@@ -12,65 +12,131 @@ Write-Host "path: $PSScriptRoot"
 Set-Location -Path $PSScriptRoot
 Write-Host "path: $PSScriptRoot"
 
-$phpUrl = "https://windows.php.net/downloads/releases/php-8.2.28-Win32-vs16-x64.zip"
+
+$architecture = (Get-CimInstance Win32_OperatingSystem).OSArchitecture
+
+$expectedVersion = "8.4.7"
+
 $phpZip = "php.zip"
 $phpDir = "php"
 $shareDir = "share"
 
-if (-Not (Test-Path $shareDir)) {
+
+
+if ($architecture -eq "64-bit") {
+    $phpUrl = "https://windows.php.net/downloads/releases/php-$expectedVersion-Win32-vs17-x64.zip"
+} elseif ($architecture -eq "32-bit") {
+    $phpUrl = "https://windows.php.net/downloads/releases/php-$expectedVersion-Win32-vs17-x86.zip"
+} else {
+    Write-Host "Could not determine the operating system architecture. Detected value: $architecture"
+    exit
+}
+
+# Functions
+function CreateShareDirectory {
+    param([string]$shareDir)
+    
     Write-Host "Creating 'share' directory..."
     New-Item -Path $shareDir -ItemType Directory
 }
 
-if (-Not (Test-Path $phpZip) -and -Not (Test-Path $phpDir)) {
+function DownloadPHP {
+    param([string]$phpUrl , [string]$phpZip)
+
     Write-Host "Downloading PHP..."
     Invoke-WebRequest -Uri $phpUrl -OutFile $phpZip
-
+    
+}
+function ExtractPHPZip {
+    param([string]$phpZip , [string]$phpDir)
+    
     Write-Host "Extracting PHP..."
     Expand-Archive -Path $phpZip -DestinationPath $phpDir -Force
 
-    if (Test-Path $phpDir) {
-        Write-Host "Deleting php.zip after successful extraction..."
-        Remove-Item $phpZip -Force
+}
+
+function DeletePHPZip {
+    param([string]$phpZip)
+    
+    Write-Host "Deleting php.zip after successful extraction..."
+    Remove-Item $phpZip -Force
+
+}
+
+function RemovePHPFolder {    
+    Remove-Item -Path .\php -Recurse -Force
+}
+
+
+function InstallApp {
+    param([string]$phpUrl, [string]$phpZip, [string]$phpDir)
+    
+     DownloadPHP $phpUrl $phpZip
+     ExtractPHPZip $phpZip $phpDir
+
+     if (Test-Path $phpDir) {
+        DeletePHPZip $phpZip
     }
+
+}
+
+
+
+
+if (-Not (Test-Path $shareDir)) {
+    CreateShareDirectory $shareDir
+}
+
+if (-Not (Test-Path $phpZip) -and -Not (Test-Path $phpDir)) {
+ 
+    InstallApp $phpUrl $phpZip $phpDir
+
 }
 elseif ((Test-Path $phpZip) -and (-Not (Test-Path $phpDir))) {
-    Write-Host "Extracting existing PHP archive..."
-    Expand-Archive -Path $phpZip -DestinationPath $phpDir -Force
+
+    ExtractPHPZip $phpZip $phpDir
 
     if (Test-Path $phpDir) {
-        Write-Host "Deleting php.zip after extraction..."
-        Remove-Item $phpZip -Force
+
+         DeletePHPZip $phpZip
     }
 }
 else {
     Write-Host "PHP already downloaded and extracted. Skipping..."
 
     if (Test-Path $phpZip) {
-        Write-Host "PHP folder already exists. Deleting leftover php.zip..."
-        Remove-Item $phpZip -Force
+
+         DeletePHPZip $phpZip
     }
 }
 
 
-# $phpUrl = "https://windows.php.net/downloads/releases/php-8.2.28-Win32-vs16-x64.zip"
-# $phpZip = "php.zip"
-# $phpDir = "php"
 
-# if (-Not (Test-Path $phpZip)) {
-#     Write-Host "Downloading PHP..."
-#     Invoke-WebRequest -Uri $phpUrl -OutFile $phpZip
 
-#     Write-Host "Extracting PHP..."
-#     Expand-Archive -Path $phpZip -DestinationPath $phpDir -Force
-# }
-# elseif ((Test-Path $phpZip) -and (-Not (Test-Path $phpDir))) {
-#     Write-Host "Extracting existing PHP archive..."
-#     Expand-Archive -Path $phpZip -DestinationPath $phpDir -Force
-# }
-# else {
-#     Write-Host "PHP already downloaded and extracted. Skipping..."
-# }
+$phpExecutable = ".\php\php.exe"
+$currentVersion = $null
+
+$phpOutput = & $phpExecutable -v 2>&1 | Out-String
+
+
+if ($phpOutput -match "PHP\s+([0-9\.]+)") {
+    $currentVersion = $Matches[1]
+}
+
+if ($currentVersion -eq $expectedVersion) {
+    Write-Host "PHP version $expectedVersion is installed and up to date."
+
+} else {
+    if ($currentVersion) {
+        Write-Host "PHP update required. Current version: $currentVersion, Required version: $expectedVersion."
+
+         RemovePHPFolder
+         InstallApp $phpUrl $phpZip $phpDir
+
+    } else {
+        Write-Host "PHP installation or update to version $expectedVersion is required."
+    }
+}
 
 $localIP = Get-WmiObject Win32_NetworkAdapterConfiguration |
     Where-Object { $_.IPEnabled -eq $true -and $_.IPAddress -ne $null } |
@@ -118,6 +184,7 @@ try {
 catch {
     Write-Host "Failed to add firewall rule: $_" -ForegroundColor Red
 }
+
 
 Start-Process powershell -ArgumentList @(
     "-NoExit",
