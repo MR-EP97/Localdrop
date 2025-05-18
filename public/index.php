@@ -21,37 +21,48 @@ $files = array_diff(scandir($shareDir), ['.', '..']);
 <head>
     <meta charset="UTF-8">
     <title>Simple Share App</title>
-    <style>
+    <!-- <style>
         body { font-family: Arial; padding: 20px; }
         .file { margin-bottom: 10px; }
         .file a { text-decoration: none; color: #333; }
         .upload { margin-top: 30px; }
-    </style>
+    </style> -->
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <h2>Shared Files</h2>
+<div class="container">
+        <div class="file-list">
+             <h2>Shared Files</h2>
 
-    <?php if (empty($files)): ?>
-        <p>No files uploaded yet.</p>
-    <?php else: ?>
-        <ul>
-        <?php foreach ($files as $file): ?>
-            <li class="file">
-                <?php echo htmlspecialchars($file); ?>
-                — <a href="download.php?file=<?php echo urlencode($file); ?>" download>Download</a>
-            </li>
-        <?php endforeach; ?>
-        </ul>
-    <?php endif; ?>
-
-    <div class="upload">
-        <h3>Upload a File</h3>
-        <form method="post" enctype="multipart/form-data">
-            <input type="file" name="file" required>
-            <button type="submit">Upload</button>
-        </form>
-    </div>
-
+            <?php if (empty($files)): ?>
+                <p id="no-file" >No files uploaded yet.</p>
+            <?php else: ?>
+                <ul>
+                <?php foreach ($files as $file): ?>
+                    <li class="file">
+                        <?php echo htmlspecialchars($file); ?>
+                        — <a href="download.php?file=<?php echo urlencode($file); ?>" download>Download</a>
+                    </li>
+                <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </div>
+        <div class="upload">
+                <h3>Upload a File</h3>
+                <form method="post" enctype="multipart/form-data">
+                    <!-- <input type="file" name="file" required> -->
+                    <div class="choose">
+                        <label for="file-upload" class="custom-file-upload">
+                            <img src="img/icons8-add-file-48.png" id="upload-icon">
+                            <span>choose file</span> 
+                        </label>
+                        <input type="file" name="file" id="file-upload" hidden required />
+                        
+                    </div>
+                         <button type="submit" >Upload</button>
+                </form>
+        </div>
+    <div>
 </body>
 </html>
